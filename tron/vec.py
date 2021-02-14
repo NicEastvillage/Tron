@@ -1,4 +1,5 @@
 import math
+import random
 
 from rlbot.utils.game_state_util import Vector3
 
@@ -57,3 +58,11 @@ class Vec3:
 
     def to_desired_vec(self):
         return Vector3(self.x, self.y, self.z)
+
+    @staticmethod
+    def random() -> 'Vec3':
+        return Vec3(
+            1 - 2 * random.random(),
+            1 - 2 * random.random(),
+            1 - 2 * random.random(),
+        )

@@ -12,7 +12,7 @@ class Trail:
         self.team = team
         self.points = []
 
-        self.duration = 12
+        self.duration = 13
 
         self.segment_size = 115
 
@@ -44,6 +44,7 @@ class Trail:
         earliest = self.points[0]
         if earliest.time + self.duration < time:
             self.points = self.points[1:]
+        self.points = self.points[-200:]
 
     def do_collisions(self, script, packet):
         ball_pos = Vec3(packet.game_ball.physics.location)
@@ -67,6 +68,13 @@ class Trail:
                     location=ball_pos_moved.to_desired_vec(),
                     velocity=refl_vel.to_desired_vec())
                 )))
+                script.particle_burst(
+                    packet.game_info.seconds_elapsed,
+                    seg_start + ball_proj_seg + seg_ball_u * 10,
+                    seg_ball_u,
+                    int(1 + abs(vel.dot(seg_ball_u) / 300) ** 3),
+                    self.team
+                )
 
             # Cars
             for car_index in range(packet.num_cars):
@@ -78,16 +86,23 @@ class Trail:
                 car_proj_seg = seg * t
                 seg_car = (car_pos_from_seg_pov - car_proj_seg)
                 # seg_car_local = relative_location(Vec3(), car_ori, seg_car)
-                if 0 <= t <= 1 and not seg_car.longer_than(92):
+                if 0 <= t <= 1 and not seg_car.longer_than(85):
                     # Collision
                     seg_car_u = seg_car.unit()
                     vel = Vec3(car.physics.velocity)
                     refl_vel = vel - 1.5 * vel.dot(seg_car_u) * seg_car_u
-                    car_pos_moved = seg_start + car_proj_seg + seg_car_u * 93
+                    car_pos_moved = seg_start + car_proj_seg + seg_car_u * 86
                     script.set_game_state(GameState(cars={car_index: CarState(physics=Physics(
                         location=car_pos_moved.to_desired_vec(),
                         velocity=refl_vel.to_desired_vec())
                     )}))
+                    script.particle_burst(
+                        packet.game_info.seconds_elapsed,
+                        seg_start + car_proj_seg + seg_car_u * 13,
+                        seg_car_u,
+                        int(1 + abs(vel.dot(seg_car_u) / 300) ** 3),
+                        self.team
+                    )
 
     def render(self, renderer):
         if len(self.points) > 1:
