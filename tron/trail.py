@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from rlbot.utils.game_state_util import GameState, BallState, Physics
+from rlbot.utils.game_state_util import GameState, BallState, Physics, CarState
 
+from orientation import Orientation, relative_location
 from vec import Vec3
 
 
@@ -15,12 +16,18 @@ class Trail:
 
         self.segment_size = 115
 
-    def clear(self):
+    def clear(self, renderer):
         self.points = []
+        renderer.begin_rendering(f"trail-{self.index}-top")
+        renderer.end_rendering()
+        renderer.begin_rendering(f"trail-{self.index}-mid")
+        renderer.end_rendering()
+        renderer.begin_rendering(f"trail-{self.index}-bottom")
+        renderer.end_rendering()
 
     def update(self, car, time):
-
-        pos = Vec3(car.physics.location) + Vec3(z=12)
+        ori = Orientation(car.physics.rotation)
+        pos = Vec3(car.physics.location) + Vec3(z=12) - 30 * ori.forward
         if len(self.points) == 0:
             # Initial point
             point = TrailPoint(pos, time)
@@ -41,25 +48,46 @@ class Trail:
     def do_collisions(self, script, packet):
         ball_pos = Vec3(packet.game_ball.physics.location)
         for i in range(len(self.points) - 2):
-            seq_start = self.points[i].pos
-            seq_end = self.points[i + 1].pos
+            seg_start = self.points[i].pos
+            seg_end = self.points[i + 1].pos
+            seg = seg_end - seg_start
 
-            seq = seq_end - seq_start
-            ball_pos_from_seq_pov = ball_pos - seq_start
-            t = (ball_pos_from_seq_pov.dot(seq) / seq.dot(seq))
-            ball_proj_seq = seq * t
-            seq_ball = (ball_pos_from_seq_pov - ball_proj_seq)
-            if 0 <= t <= 1 and not seq_ball.longer_than(100):
+            # Ball
+            ball_pos_from_seg_pov = ball_pos - seg_start
+            t = (ball_pos_from_seg_pov.dot(seg) / seg.dot(seg))
+            ball_proj_seg = seg * t
+            seg_ball = (ball_pos_from_seg_pov - ball_proj_seg)
+            if 0 <= t <= 1 and not seg_ball.longer_than(100):
                 # Collision
-                seq_ball_u = seq_ball.unit()
+                seg_ball_u = seg_ball.unit()
                 vel = Vec3(packet.game_ball.physics.velocity)
-                refl_vel = vel - 2 * vel.dot(seq_ball_u) * seq_ball_u
-                ball_pos_moved = seq_start + ball_proj_seq + seq_ball_u * 101
+                refl_vel = vel - 1.9 * vel.dot(seg_ball_u) * seg_ball_u
+                ball_pos_moved = seg_start + ball_proj_seg + seg_ball_u * 101
                 script.set_game_state(GameState(ball=BallState(physics=Physics(
                     location=ball_pos_moved.to_desired_vec(),
                     velocity=refl_vel.to_desired_vec())
                 )))
-                pass
+
+            # Cars
+            for car_index in range(packet.num_cars):
+                car = packet.game_cars[car_index]
+                car_ori = Orientation(car.physics.rotation)
+                car_pos = Vec3(car.physics.location)
+                car_pos_from_seg_pov = car_pos - seg_start
+                t = (car_pos_from_seg_pov.dot(seg) / seg.dot(seg))
+                car_proj_seg = seg * t
+                seg_car = (car_pos_from_seg_pov - car_proj_seg)
+                # seg_car_local = relative_location(Vec3(), car_ori, seg_car)
+                if 0 <= t <= 1 and not seg_car.longer_than(92):
+                    # Collision
+                    seg_car_u = seg_car.unit()
+                    vel = Vec3(car.physics.velocity)
+                    refl_vel = vel - 1.5 * vel.dot(seg_car_u) * seg_car_u
+                    car_pos_moved = seg_start + car_proj_seg + seg_car_u * 93
+                    script.set_game_state(GameState(cars={car_index: CarState(physics=Physics(
+                        location=car_pos_moved.to_desired_vec(),
+                        velocity=refl_vel.to_desired_vec())
+                    )}))
 
     def render(self, renderer):
         if len(self.points) > 1:
