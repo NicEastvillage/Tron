@@ -6,7 +6,7 @@ from threading import Thread
 
 from playsound import playsound
 
-MIN_SOUND_INTERVAL = 0.15
+from settings import MIN_SOUND_INTERVAL, DISABLE_SOUNDS
 
 
 @dataclass
@@ -40,6 +40,8 @@ class SoundPlayer:
         self.last_sound_time = time()
 
     def ball_hit(self, strength):
+        if DISABLE_SOUNDS:
+            return
         sounds = list(filter(lambda s: s.strength_min <= strength <= s.strength_max, self.trail_ball_hit_sounds))
         if len(sounds) > 0 and self.last_sound_time < time() - MIN_SOUND_INTERVAL:
             sound_file = random.choice(sounds).file
@@ -47,6 +49,8 @@ class SoundPlayer:
             self.last_sound_time = time()
 
     def car_hit(self, strength):
+        if DISABLE_SOUNDS:
+            return
         sounds = list(filter(lambda s: s.strength_min <= strength <= s.strength_max, self.trail_car_hit_sounds))
         if len(sounds) > 0 and self.last_sound_time < time() - MIN_SOUND_INTERVAL:
             sound_file = random.choice(sounds).file

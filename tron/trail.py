@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 from rlbot.utils.game_state_util import GameState, BallState, Physics, CarState
 
-from orientation import Orientation, relative_location
+from orientation import Orientation
+from settings import IGNORE_BOT_COLLISION, IGNORE_HUMAN_COLLISION, IGNORE_BALL_COLLISION, MAX_TRAIL_LENGTH
 from vec import Vec3
 
 
@@ -44,7 +45,7 @@ class Trail:
         earliest = self.points[0]
         if earliest.time + self.duration < time:
             self.points = self.points[1:]
-        self.points = self.points[-200:]
+        self.points = self.points[-MAX_TRAIL_LENGTH:]
 
     def do_collisions(self, script, packet):
         ball_pos = Vec3(packet.game_ball.physics.location)
@@ -54,33 +55,38 @@ class Trail:
             seg = seg_end - seg_start
 
             # Ball
-            ball_pos_from_seg_pov = ball_pos - seg_start
-            t = (ball_pos_from_seg_pov.dot(seg) / seg.dot(seg))
-            ball_proj_seg = seg * t
-            seg_ball = (ball_pos_from_seg_pov - ball_proj_seg)
-            if 0 <= t <= 1 and not seg_ball.longer_than(100):
-                # Collision
-                seg_ball_u = seg_ball.unit()
-                vel = Vec3(packet.game_ball.physics.velocity)
-                refl_vel = vel - 1.9 * vel.dot(seg_ball_u) * seg_ball_u
-                ball_pos_moved = seg_start + ball_proj_seg + seg_ball_u * 101
-                script.set_game_state(GameState(ball=BallState(physics=Physics(
-                    location=ball_pos_moved.to_desired_vec(),
-                    velocity=refl_vel.to_desired_vec())
-                )))
-                script.particle_burst(
-                    packet.game_info.seconds_elapsed,
-                    seg_start + ball_proj_seg + seg_ball_u * 10,
-                    seg_ball_u,
-                    int(1 + abs(vel.dot(seg_ball_u) / 300) ** 3),
-                    self.team
-                )
-                hit_strength = abs(seg_ball_u.dot(vel))
-                script.sounds.ball_hit(hit_strength)
+            if not IGNORE_BALL_COLLISION:
+                ball_pos_from_seg_pov = ball_pos - seg_start
+                t = (ball_pos_from_seg_pov.dot(seg) / seg.dot(seg))
+                ball_proj_seg = seg * t
+                seg_ball = (ball_pos_from_seg_pov - ball_proj_seg)
+                if 0 <= t <= 1 and not seg_ball.longer_than(100):
+                    # Collision
+                    seg_ball_u = seg_ball.unit()
+                    vel = Vec3(packet.game_ball.physics.velocity)
+                    refl_vel = vel - 1.9 * vel.dot(seg_ball_u) * seg_ball_u
+                    ball_pos_moved = seg_start + ball_proj_seg + seg_ball_u * 101
+                    script.set_game_state(GameState(ball=BallState(physics=Physics(
+                        location=ball_pos_moved.to_desired_vec(),
+                        velocity=refl_vel.to_desired_vec())
+                    )))
+                    script.particle_burst(
+                        packet.game_info.seconds_elapsed,
+                        seg_start + ball_proj_seg + seg_ball_u * 10,
+                        seg_ball_u,
+                        int(1 + abs(vel.dot(seg_ball_u) / 300) ** 3),
+                        self.team
+                    )
+                    hit_strength = abs(seg_ball_u.dot(vel))
+                    script.sounds.ball_hit(hit_strength)
 
             # Cars
             for car_index in range(packet.num_cars):
                 car = packet.game_cars[car_index]
+                if car.is_demolished \
+                        or (car.is_bot and IGNORE_BOT_COLLISION) \
+                        or (not car.is_bot and IGNORE_HUMAN_COLLISION):
+                    continue
                 car_ori = Orientation(car.physics.rotation)
                 car_pos = Vec3(car.physics.location)
                 car_pos_from_seg_pov = car_pos - seg_start

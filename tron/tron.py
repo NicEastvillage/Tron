@@ -1,5 +1,4 @@
 import random
-from typing import Tuple
 
 from rlbot.agents.base_script import BaseScript
 
