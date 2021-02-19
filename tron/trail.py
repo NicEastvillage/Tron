@@ -75,6 +75,8 @@ class Trail:
                     int(1 + abs(vel.dot(seg_ball_u) / 300) ** 3),
                     self.team
                 )
+                hit_strength = abs(seg_ball_u.dot(vel))
+                script.sounds.ball_hit(hit_strength)
 
             # Cars
             for car_index in range(packet.num_cars):
@@ -103,6 +105,8 @@ class Trail:
                         int(1 + abs(vel.dot(seg_car_u) / 300) ** 3),
                         self.team
                     )
+                    hit_strength = abs(seg_car_u.dot(vel))
+                    script.sounds.car_hit(hit_strength)
 
     def render(self, renderer):
         if len(self.points) > 1:

@@ -4,6 +4,7 @@ from typing import Tuple
 from rlbot.agents.base_script import BaseScript
 
 from particle import Particle
+from sounds import SoundPlayer
 from trail import Trail
 from vec import Vec3
 
@@ -14,6 +15,7 @@ class Tron(BaseScript):
         self.trails = []
         self.particles = []
         self.is_kickoff = False
+        self.sounds = SoundPlayer()
 
     def run(self):
         while True:
